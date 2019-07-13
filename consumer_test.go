@@ -252,13 +252,9 @@ func TestRun(t *testing.T) {
 		require.Len(tt, res[0].Messages, 1)
 		require.Equal(tt, msg1.ID, res[0].Messages[0].ID)
 
-		// after 10ms, add another message to the stream to let the consumer
-		// consume it
-		go func() {
-			time.Sleep(10 * time.Millisecond)
-			err := p.Enqueue(msg2)
-			require.NoError(tt, err)
-		}()
+		// add another message to the stream to let the consumer consume it
+		err = p.Enqueue(msg2)
+		require.NoError(tt, err)
 
 		// watch for consumer errors
 		go func() {
