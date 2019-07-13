@@ -1,8 +1,10 @@
 dist: trusty
 sudo: false
 language: go
-services:
-  - redis-server
+addons:
+  apt:
+    packages:
+      - redis-server
 go: "1.12.7"
 env:
   - GO111MODULE=on
