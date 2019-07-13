@@ -1,0 +1,14 @@
+dist: trusty
+sudo: false
+language: go
+services:
+  - redis-server
+go: 1.12.x
+install:
+  - make setup
+  - make install
+script:
+  - make lint
+  - make test
+  - make enforce
+  - make coveralls
