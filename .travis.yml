@@ -4,6 +4,8 @@ language: go
 services:
   - redis-server
 go: 1.12.x
+env:
+  - GO111MODULE=on
 install:
   - make setup
   - make install
