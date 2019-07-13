@@ -1,0 +1,18 @@
+dist: trusty
+sudo: false
+language: go
+addons:
+  apt:
+    packages:
+      - redis-server
+go: "1.12.7"
+env:
+  - GO111MODULE=on
+install:
+  - make setup
+  - make install
+script:
+  - make lint
+  - make test
+  - make enforce
+  - make coveralls
