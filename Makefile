@@ -53,7 +53,8 @@ ifndef tag
 	$(error tag must be specified)
 endif
 	git-chglog --output CHANGELOG.md --next-tag $(tag)
-	git add CHANGELOG.md
+	sed -i "" "s/version-.*-green/version-$(tag)-green/" README.md
+	git add CHANGELOG.md README.md
 	git commit -m $(tag)
 	git tag $(tag)
 	git push origin master --tags
