@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis"
+	"github.com/pkg/errors"
 )
 
 var redisVersionRE = regexp.MustCompile(`redis_version:(.+)`)
@@ -46,4 +47,17 @@ func newRedisClient(options *RedisOptions) (*redis.Client, error) {
 	}
 
 	return client, nil
+}
+
+// incrementMessageID takes in a message ID (e.g. 1564886140363-0) and
+// increments the index section (e.g. 1564886140363-1). This is the next valid
+// ID value, and it can be used for paging through messages.
+func incrementMessageID(id string) (string, error) {
+	parts := strings.Split(id, "-")
+	index := parts[1]
+	parsed, err := strconv.ParseInt(index, 10, 64)
+	if err != nil {
+		return "", errors.Wrapf(err, "error parsing message ID %q", id)
+	}
+	return fmt.Sprintf("%s-%d", parts[0], parsed+1), nil
 }
