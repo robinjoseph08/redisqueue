@@ -270,7 +270,13 @@ func (c *Consumer) reclaim() {
 						}
 					}
 
-					start = res[len(res)-1].Id
+					newID, err := incrementMessageID(res[len(res)-1].Id)
+					if err != nil {
+						c.Errors <- err
+						break
+					}
+
+					start = newID
 				}
 			}
 		}
