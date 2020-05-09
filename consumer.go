@@ -14,6 +14,11 @@ import (
 // and process Messages.
 type ConsumerFunc func(*Message) error
 
+type registeredConsumer struct {
+	fn ConsumerFunc
+	id string
+}
+
 // ConsumerOptions provide options to configure the Consumer.
 type ConsumerOptions struct {
 	// Name sets the name of this consumer. This will be used when fetching from
@@ -62,12 +67,12 @@ type Consumer struct {
 	// channels.
 	Errors chan error
 
-	options *ConsumerOptions
-	redis   *redis.Client
-	funcs   map[string]ConsumerFunc
-	streams []string
-	queue   chan *Message
-	wg      *sync.WaitGroup
+	options   *ConsumerOptions
+	redis     *redis.Client
+	consumers map[string]registeredConsumer
+	streams   []string
+	queue     chan *Message
+	wg        *sync.WaitGroup
 
 	stopReclaim chan struct{}
 	stopPoll    chan struct{}
@@ -118,12 +123,12 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 	return &Consumer{
 		Errors: make(chan error),
 
-		options: options,
-		redis:   r,
-		funcs:   map[string]ConsumerFunc{},
-		streams: make([]string, 0),
-		queue:   make(chan *Message, options.BufferSize),
-		wg:      &sync.WaitGroup{},
+		options:   options,
+		redis:     r,
+		consumers: make(map[string]registeredConsumer),
+		streams:   make([]string, 0),
+		queue:     make(chan *Message, options.BufferSize),
+		wg:        &sync.WaitGroup{},
 
 		stopReclaim: make(chan struct{}, 1),
 		stopPoll:    make(chan struct{}, 1),
@@ -131,12 +136,30 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 	}, nil
 }
 
+// RegisterWithLastID is the same as Register, except that it also lets you
+// specify the oldest message to receive when first creating the consumer group.
+// This can be any valid message ID, "0" for all messages in the stream, or "$"
+// for only new messages.
+//
+// If the consumer group already exists the id field is ignored, meaning you'll
+// receive unprocessed messages.
+func (c *Consumer) RegisterWithLastID(stream string, id string, fn ConsumerFunc) {
+	if len(id) == 0 {
+		id = "0"
+	}
+
+	c.consumers[stream] = registeredConsumer{
+		fn: fn,
+		id: id,
+	}
+}
+
 // Register takes in a stream name and a ConsumerFunc that will be called when a
 // message comes in from that stream. Register must be called at least once
 // before Run is called. If the same stream name is passed in twice, the first
 // ConsumerFunc is overwritten by the second.
 func (c *Consumer) Register(stream string, fn ConsumerFunc) {
-	c.funcs[stream] = fn
+	c.RegisterWithLastID(stream, "0", fn)
 }
 
 // Run starts all of the worker goroutines and starts processing from the
@@ -146,14 +169,14 @@ func (c *Consumer) Register(stream string, fn ConsumerFunc) {
 // creating the consumer group in Redis. Run will block until Shutdown is called
 // and all of the in-flight messages have been processed.
 func (c *Consumer) Run() {
-	if len(c.funcs) == 0 {
+	if len(c.consumers) == 0 {
 		c.Errors <- errors.New("at least one consumer function needs to be registered")
 		return
 	}
 
-	for stream := range c.funcs {
+	for stream, consumer := range c.consumers {
 		c.streams = append(c.streams, stream)
-		err := c.redis.XGroupCreateMkStream(stream, c.options.GroupName, "0").Err()
+		err := c.redis.XGroupCreateMkStream(stream, c.options.GroupName, consumer.id).Err()
 		// ignoring the BUSYGROUP error makes this a noop
 		if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
 			c.Errors <- errors.Wrap(err, "error creating consumer group")
@@ -161,7 +184,7 @@ func (c *Consumer) Run() {
 		}
 	}
 
-	for i := 0; i < len(c.funcs); i++ {
+	for i := 0; i < len(c.consumers); i++ {
 		c.streams = append(c.streams, ">")
 	}
 
@@ -214,7 +237,7 @@ func (c *Consumer) reclaim() {
 			c.stopPoll <- struct{}{}
 			return
 		case <-ticker.C:
-			for stream := range c.funcs {
+			for stream := range c.consumers {
 				start := "-"
 				end := "+"
 
@@ -373,7 +396,6 @@ func (c *Consumer) process(msg *Message) (err error) {
 			err = errors.Errorf("ConsumerFunc panic: %v", r)
 		}
 	}()
-	fn := c.funcs[msg.Stream]
-	err = fn(msg)
+	err = c.consumers[msg.Stream].fn(msg)
 	return
 }

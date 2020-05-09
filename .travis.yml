@@ -5,7 +5,7 @@ addons:
   apt:
     packages:
       - redis-server
-go: "1.12.7"
+go: "1.14.2"
 env:
   - GO111MODULE=on
 install:

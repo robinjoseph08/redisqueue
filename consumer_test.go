@@ -77,8 +77,50 @@ func TestRegister(t *testing.T) {
 
 		c.Register(tt.Name(), fn)
 
-		assert.Len(tt, c.funcs, 1)
+		assert.Len(tt, c.consumers, 1)
 	})
+}
+
+func TestRegisterWithLastID(t *testing.T) {
+	fn := func(msg *Message) error {
+		return nil
+	}
+
+	tests := []struct {
+		name   string
+		stream string
+		id     string
+		want   map[string]registeredConsumer
+	}{
+		{
+			name: "custom_id",
+			id:   "42",
+			want: map[string]registeredConsumer{
+				"test": {id: "42", fn: fn},
+			},
+		},
+		{
+			name: "no_id",
+			id:   "",
+			want: map[string]registeredConsumer{
+				"test": {id: "0", fn: fn},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewConsumer()
+			require.NoError(t, err)
+
+			c.RegisterWithLastID("test", tt.id, fn)
+
+			assert.Len(t, c.consumers, 1)
+			assert.Contains(t, c.consumers, "test")
+			assert.Equal(t, c.consumers["test"].id, tt.want["test"].id)
+			assert.NotNil(t, c.consumers["test"].fn)
+		})
+	}
 }
 
 func TestRun(t *testing.T) {
