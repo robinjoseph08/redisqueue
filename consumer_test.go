@@ -41,15 +41,19 @@ func TestNewConsumerWithOptions(t *testing.T) {
 		assert.Equal(tt, 1*time.Second, c.options.ReclaimInterval)
 	})
 
-	t.Run("allows override of Name, GroupName, BlockingTimeout, and ReclaimTimeout", func(tt *testing.T) {
+	t.Run("allows override of Name, GroupName, BlockingTimeout, ReclaimTimeout, and RedisClient", func(tt *testing.T) {
+		rc := newRedisClient(nil)
+
 		c, err := NewConsumerWithOptions(&ConsumerOptions{
 			Name:            "test_name",
 			GroupName:       "test_group_name",
 			BlockingTimeout: 10 * time.Second,
 			ReclaimInterval: 10 * time.Second,
+			RedisClient:     rc,
 		})
 		require.NoError(tt, err)
 
+		assert.Equal(tt, rc, c.redis)
 		assert.Equal(tt, "test_name", c.options.Name)
 		assert.Equal(tt, "test_group_name", c.options.GroupName)
 		assert.Equal(tt, 10*time.Second, c.options.BlockingTimeout)

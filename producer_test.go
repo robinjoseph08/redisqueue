@@ -24,6 +24,18 @@ func TestNewProducerWithOptions(t *testing.T) {
 		assert.NotNil(tt, p)
 	})
 
+	t.Run("allows custom *redis.Client", func(tt *testing.T) {
+		rc := newRedisClient(nil)
+
+		p, err := NewProducerWithOptions(&ProducerOptions{
+			RedisClient: rc,
+		})
+		require.NoError(tt, err)
+
+		assert.NotNil(tt, p)
+		assert.Equal(tt, rc, p.redis)
+	})
+
 	t.Run("bubbles up errors", func(tt *testing.T) {
 		_, err := NewProducerWithOptions(&ProducerOptions{
 			RedisOptions: &RedisOptions{Addr: "localhost:0"},
