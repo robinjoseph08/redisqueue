@@ -1,6 +1,6 @@
 # redisqueue
 
-![Version](https://img.shields.io/badge/version-v1.1.0-green.svg)
+![Version](https://img.shields.io/badge/version-v2.0.0-green.svg)
 [![GoDoc](https://godoc.org/github.com/robinjoseph08/redisqueue?status.svg)](https://pkg.go.dev/github.com/robinjoseph08/redisqueue/v2?tab=doc)
 [![Build Status](https://travis-ci.org/robinjoseph08/redisqueue.svg?branch=master)](https://travis-ci.org/robinjoseph08/redisqueue)
 [![Coverage Status](https://coveralls.io/repos/github/robinjoseph08/redisqueue/badge.svg?branch=master)](https://coveralls.io/github/robinjoseph08/redisqueue?branch=master)

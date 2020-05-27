@@ -1,15 +1,18 @@
 
+<a name="v2.0.0"></a>
+## [v2.0.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v1.1.0...v2.0.0) (2020-05-26)
+
+### Features
+
+* **redis:** update to go-redis/v7 and switch to redisqueue/v2 ([#11](https://github.com/robinjoseph08/go-pg-migrations/issues/11))
+
+
 <a name="v1.1.0"></a>
 ## [v1.1.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v1.0.1...v1.1.0) (2020-05-26)
 
 ### Chore
 
 * **makefile:** update Makefile ([#10](https://github.com/robinjoseph08/go-pg-migrations/issues/10))
-
-### Features
-
-* **consumer:** add support for registering consumer at specific Message ID ([#7](https://github.com/robinjoseph08/go-pg-migrations/issues/7))
-* **redis:** add ability to inject `*redis.Client` into producer & consumer ([#9](https://github.com/robinjoseph08/go-pg-migrations/issues/9))
 
 
 <a name="v1.0.1"></a>
