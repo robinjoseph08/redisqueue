@@ -1,7 +1,7 @@
 package redisqueue
 
 import (
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 )
 
 // ProducerOptions provide options to configure the Producer.
@@ -23,7 +23,8 @@ type ProducerOptions struct {
 	// an already-made *redis.Client for use in the consumer.
 	RedisClient *redis.Client
 	// RedisOptions allows you to configure the underlying Redis connection.
-	// More info here: https://godoc.org/github.com/go-redis/redis#Options.
+	// More info here:
+	// https://pkg.go.dev/github.com/go-redis/redis/v7?tab=doc#Options.
 	//
 	// This field is used if RedisClient field is nil.
 	RedisOptions *RedisOptions

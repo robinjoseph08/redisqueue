@@ -1,7 +1,7 @@
 # redisqueue
 
 ![Version](https://img.shields.io/badge/version-v1.1.0-green.svg)
-[![GoDoc](https://godoc.org/github.com/robinjoseph08/redisqueue?status.svg)](https://godoc.org/github.com/robinjoseph08/redisqueue)
+[![GoDoc](https://godoc.org/github.com/robinjoseph08/redisqueue?status.svg)](https://pkg.go.dev/github.com/robinjoseph08/redisqueue/v2?tab=doc)
 [![Build Status](https://travis-ci.org/robinjoseph08/redisqueue.svg?branch=master)](https://travis-ci.org/robinjoseph08/redisqueue)
 [![Coverage Status](https://coveralls.io/repos/github/robinjoseph08/redisqueue/badge.svg?branch=master)](https://coveralls.io/github/robinjoseph08/redisqueue?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/robinjoseph08/redisqueue)](https://goreportcard.com/report/github.com/robinjoseph08/redisqueue)
@@ -30,6 +30,23 @@ streams](https://redis.io/topics/streams-intro).
 - A batch size setting to limit the total messages in flight.
 - Support for multiple streams.
 
+## Installation
+
+`redisqueue` requires a Go version with Modules support and uses import
+versioning. So please make sure to initialize a Go module before installing
+`redisqueue`:
+
+```sh
+go mod init github.com/my/repo
+go get github.com/robinjoseph08/redisqueue/v2
+```
+
+Import:
+
+```go
+import "github.com/robinjoseph08/redisqueue/v2"
+```
+
 ## Example
 
 Here's an example of a producer that inserts 1000 messages into a queue:
@@ -40,7 +57,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/robinjoseph08/redisqueue"
+	"github.com/robinjoseph08/redisqueue/v2"
 )
 
 func main() {
@@ -79,7 +96,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robinjoseph08/redisqueue"
+	"github.com/robinjoseph08/redisqueue/v2"
 )
 
 func main() {
