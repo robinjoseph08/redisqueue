@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/pkg/errors"
 )
 
@@ -56,7 +56,8 @@ type ConsumerOptions struct {
 	// an already-made *redis.Client for use in the consumer.
 	RedisClient *redis.Client
 	// RedisOptions allows you to configure the underlying Redis connection.
-	// More info here: https://godoc.org/github.com/go-redis/redis#Options.
+	// More info here:
+	// https://pkg.go.dev/github.com/go-redis/redis/v7?tab=doc#Options.
 	//
 	// This field is used if RedisClient field is nil.
 	RedisOptions *RedisOptions
@@ -279,7 +280,7 @@ func (c *Consumer) reclaim() {
 								Group:    c.options.GroupName,
 								Consumer: c.options.Name,
 								MinIdle:  c.options.VisibilityTimeout,
-								Messages: []string{r.Id},
+								Messages: []string{r.ID},
 							}).Result()
 							if err != nil && err != redis.Nil {
 								c.Errors <- errors.Wrapf(err, "error claiming %d message(s)", len(msgs))
@@ -295,9 +296,9 @@ func (c *Consumer) reclaim() {
 							// exists, the only way we can get it out of the
 							// pending state is to acknowledge it.
 							if err == redis.Nil {
-								err = c.redis.XAck(stream, c.options.GroupName, r.Id).Err()
+								err = c.redis.XAck(stream, c.options.GroupName, r.ID).Err()
 								if err != nil {
-									c.Errors <- errors.Wrapf(err, "error acknowledging after failed claim for %q stream and %q message", stream, r.Id)
+									c.Errors <- errors.Wrapf(err, "error acknowledging after failed claim for %q stream and %q message", stream, r.ID)
 									continue
 								}
 							}
@@ -305,7 +306,7 @@ func (c *Consumer) reclaim() {
 						}
 					}
 
-					newID, err := incrementMessageID(res[len(res)-1].Id)
+					newID, err := incrementMessageID(res[len(res)-1].ID)
 					if err != nil {
 						c.Errors <- err
 						break

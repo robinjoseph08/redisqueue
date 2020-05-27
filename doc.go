@@ -33,7 +33,7 @@ Here's an example of a producer that inserts 1000 messages into a queue:
     import (
     	"fmt"
 
-    	"github.com/robinjoseph08/redisqueue"
+    	"github.com/robinjoseph08/redisqueue/v2"
     )
 
     func main() {
@@ -70,7 +70,7 @@ And here's an example of a consumer that reads the messages off of that queue:
     	"fmt"
     	"time"
 
-    	"github.com/robinjoseph08/redisqueue"
+    	"github.com/robinjoseph08/redisqueue/v2"
     )
 
     func main() {

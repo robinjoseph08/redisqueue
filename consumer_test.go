@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -321,7 +321,7 @@ func TestRun(t *testing.T) {
 		}).Result()
 		require.NoError(tt, err)
 		require.Len(tt, pendingRes, 1)
-		require.Equal(tt, msg1.ID, pendingRes[0].Id)
+		require.Equal(tt, msg1.ID, pendingRes[0].ID)
 	})
 
 	t.Run("acknowledges pending messages that have already been deleted", func(tt *testing.T) {
