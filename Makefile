@@ -1,5 +1,4 @@
 BIN_DIR ?= ./bin
-DIRS ?= $(shell find . -name '*.go' | grep --invert-match 'vendor' | xargs -n 1 dirname | sort --unique)
 GO_TOOLS := \
 	github.com/git-chglog/git-chglog/cmd/git-chglog \
 	github.com/mattn/goveralls \
@@ -23,7 +22,7 @@ clean:
 
 coveralls:
 	@echo "---> Sending coverage info to Coveralls"
-	goveralls -coverprofile=$(COVERAGE_PROFILE) -service=travis-ci
+	$(BIN_DIR)/goveralls -coverprofile=$(COVERAGE_PROFILE) -service=travis-ci
 
 .PHONY: enforce
 enforce:
@@ -42,7 +41,7 @@ install:
 	go mod download
 
 .PHONY: lint
-lint:
+lint: $(BIN_DIR)/golangci-lint
 	@echo "---> Linting"
 	$(BIN_DIR)/golangci-lint run
 
@@ -52,7 +51,7 @@ release:
 ifndef tag
 	$(error tag must be specified)
 endif
-	git-chglog --output CHANGELOG.md --next-tag $(tag)
+	$(BIN_DIR)/git-chglog --output CHANGELOG.md --next-tag $(tag)
 	sed -i "" "s/version-.*-green/version-$(tag)-green/" README.md
 	git add CHANGELOG.md README.md
 	git commit -m $(tag)
@@ -60,10 +59,13 @@ endif
 	git push origin master --tags
 
 .PHONY: setup
-setup: install
+setup: $(BIN_DIR)/golangci-lint
 	@echo "--> Setting up"
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(BIN_DIR) v1.16.0
-	go get $(GO_TOOLS) && GOBIN=$$(realpath $(BIN_DIR)) go install $(GO_TOOLS)
+	GOBIN=$(PWD)/$(subst ./,,$(BIN_DIR)) go install $(GO_TOOLS)
+
+$(BIN_DIR)/golangci-lint:
+	@echo "--> Installing linter"
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(BIN_DIR) v1.27.0
 
 .PHONY: test
 test:
