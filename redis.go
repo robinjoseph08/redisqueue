@@ -17,36 +17,39 @@ var redisVersionRE = regexp.MustCompile(`redis_version:(.+)`)
 type RedisOptions = redis.Options
 
 // newRedisClient creates a new Redis client with the given options. If options
-// is nil, it will use default options. In addition to creating the client, it
-// also ensures that it can connect to the actual instance and that the instance
-// supports Redis streams (i.e. it's at least v5).
-func newRedisClient(options *RedisOptions) (*redis.Client, error) {
+// is nil, it will use default options.
+func newRedisClient(options *RedisOptions) *redis.Client {
 	if options == nil {
 		options = &RedisOptions{}
 	}
-	client := redis.NewClient(options)
+	return redis.NewClient(options)
+}
 
-	// make sure Redis supports streams (i.e. is at least v5)
+// redisPreflightChecks makes sure the Redis instance backing the *redis.Client
+// offers the functionality we need. Specifically, it also that it can connect
+// to the actual instance and that the instance supports Redis streams (i.e.
+// it's at least v5).
+func redisPreflightChecks(client *redis.Client) error {
 	info, err := client.Info("server").Result()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	match := redisVersionRE.FindAllStringSubmatch(info, -1)
 	if len(match) < 1 {
-		return nil, fmt.Errorf("could not extract redis version")
+		return fmt.Errorf("could not extract redis version")
 	}
 	version := strings.TrimSpace(match[0][1])
 	parts := strings.Split(version, ".")
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if major < 5 {
-		return nil, fmt.Errorf("redis streams are not supported in version %q", version)
+		return fmt.Errorf("redis streams are not supported in version %q", version)
 	}
 
-	return client, nil
+	return nil
 }
 
 // incrementMessageID takes in a message ID (e.g. 1564886140363-0) and
