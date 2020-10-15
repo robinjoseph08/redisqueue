@@ -29,7 +29,7 @@ func newRedisClient(options *RedisOptions) *redis.Client {
 // offers the functionality we need. Specifically, it also that it can connect
 // to the actual instance and that the instance supports Redis streams (i.e.
 // it's at least v5).
-func redisPreflightChecks(client *redis.Client) error {
+func redisPreflightChecks(client redis.UniversalClient) error {
 	info, err := client.Info("server").Result()
 	if err != nil {
 		return err

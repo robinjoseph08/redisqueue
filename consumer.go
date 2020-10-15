@@ -53,8 +53,9 @@ type ConsumerOptions struct {
 	// Concurrency dictates how many goroutines to spawn to handle the messages.
 	Concurrency int
 	// RedisClient supersedes the RedisOptions field, and allows you to inject
-	// an already-made *redis.Client for use in the consumer.
-	RedisClient *redis.Client
+	// an already-made Redis Client for use in the consumer. This may be either
+	// the standard client or a cluster client.
+	RedisClient redis.UniversalClient
 	// RedisOptions allows you to configure the underlying Redis connection.
 	// More info here:
 	// https://pkg.go.dev/github.com/go-redis/redis/v7?tab=doc#Options.
@@ -74,7 +75,7 @@ type Consumer struct {
 	Errors chan error
 
 	options   *ConsumerOptions
-	redis     *redis.Client
+	redis     redis.UniversalClient
 	consumers map[string]registeredConsumer
 	streams   []string
 	queue     chan *Message
@@ -121,7 +122,7 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 		options.ReclaimInterval = 1 * time.Second
 	}
 
-	var r *redis.Client
+	var r redis.UniversalClient
 
 	if options.RedisClient != nil {
 		r = options.RedisClient
