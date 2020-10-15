@@ -20,8 +20,9 @@ type ProducerOptions struct {
 	// manner. More info here: https://redis.io/commands/xadd#capped-streams.
 	ApproximateMaxLength bool
 	// RedisClient supersedes the RedisOptions field, and allows you to inject
-	// an already-made *redis.Client for use in the consumer.
-	RedisClient *redis.Client
+	// an already-made Redis Client for use in the consumer. This may be either
+	// the standard client or a cluster client.
+	RedisClient redis.UniversalClient
 	// RedisOptions allows you to configure the underlying Redis connection.
 	// More info here:
 	// https://pkg.go.dev/github.com/go-redis/redis/v7?tab=doc#Options.
@@ -34,7 +35,7 @@ type ProducerOptions struct {
 // processed later by a Consumer.
 type Producer struct {
 	options *ProducerOptions
-	redis   *redis.Client
+	redis   redis.UniversalClient
 }
 
 var defaultProducerOptions = &ProducerOptions{
@@ -51,7 +52,7 @@ func NewProducer() (*Producer, error) {
 
 // NewProducerWithOptions creates a Producer using custom ProducerOptions.
 func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
-	var r *redis.Client
+	var r redis.UniversalClient
 
 	if options.RedisClient != nil {
 		r = options.RedisClient
