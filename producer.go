@@ -1,7 +1,9 @@
 package redisqueue
 
 import (
-	"github.com/go-redis/redis/v7"
+	"context"
+
+	"github.com/go-redis/redis/v8"
 )
 
 // ProducerOptions provide options to configure the Producer.
@@ -25,7 +27,7 @@ type ProducerOptions struct {
 	RedisClient redis.UniversalClient
 	// RedisOptions allows you to configure the underlying Redis connection.
 	// More info here:
-	// https://pkg.go.dev/github.com/go-redis/redis/v7?tab=doc#Options.
+	// https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#Options.
 	//
 	// This field is used if RedisClient field is nil.
 	RedisOptions *RedisOptions
@@ -46,12 +48,12 @@ var defaultProducerOptions = &ProducerOptions{
 // NewProducer uses a default set of options to create a Producer. It sets
 // StreamMaxLength to 1000 and ApproximateMaxLength to true. In most production
 // environments, you'll want to use NewProducerWithOptions.
-func NewProducer() (*Producer, error) {
-	return NewProducerWithOptions(defaultProducerOptions)
+func NewProducerWithContext(ctx context.Context) (*Producer, error) {
+	return NewProducerWithContextOptions(ctx, defaultProducerOptions)
 }
 
 // NewProducerWithOptions creates a Producer using custom ProducerOptions.
-func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
+func NewProducerWithContextOptions(ctx context.Context, options *ProducerOptions) (*Producer, error) {
 	var r redis.UniversalClient
 
 	if options.RedisClient != nil {
@@ -60,7 +62,7 @@ func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
 		r = newRedisClient(options.RedisOptions)
 	}
 
-	if err := redisPreflightChecks(r); err != nil {
+	if err := redisPreflightChecks(ctx, r); err != nil {
 		return nil, err
 	}
 
@@ -74,7 +76,7 @@ func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
 // msg.Stream. While you can set msg.ID, unless you know what you're doing, you
 // should let Redis auto-generate the ID. If an ID is auto-generated, it will be
 // set on msg.ID for your reference. msg.Values is also required.
-func (p *Producer) Enqueue(msg *Message) error {
+func (p *Producer) EnqueueWithContext(ctx context.Context, msg *Message) error {
 	args := &redis.XAddArgs{
 		ID:     msg.ID,
 		Stream: msg.Stream,
@@ -85,7 +87,7 @@ func (p *Producer) Enqueue(msg *Message) error {
 	} else {
 		args.MaxLen = p.options.StreamMaxLength
 	}
-	id, err := p.redis.XAdd(args).Result()
+	id, err := p.redis.XAdd(ctx, args).Result()
 	if err != nil {
 		return err
 	}

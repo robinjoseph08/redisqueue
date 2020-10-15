@@ -1,6 +1,6 @@
 # redisqueue
 
-![Version](https://img.shields.io/badge/version-v2.0.0-green.svg)
+![Version](https://img.shields.io/badge/version-v2.1.0-green.svg)
 [![GoDoc](https://godoc.org/github.com/robinjoseph08/redisqueue?status.svg)](https://pkg.go.dev/github.com/robinjoseph08/redisqueue/v2?tab=doc)
 [![Build Status](https://travis-ci.org/robinjoseph08/redisqueue.svg?branch=master)](https://travis-ci.org/robinjoseph08/redisqueue)
 [![Coverage Status](https://coveralls.io/repos/github/robinjoseph08/redisqueue/badge.svg?branch=master)](https://coveralls.io/github/robinjoseph08/redisqueue?branch=master)
@@ -61,7 +61,8 @@ import (
 )
 
 func main() {
-	p, err := redisqueue.NewProducerWithOptions(&redisqueue.ProducerOptions{
+	ctx := context.Background()
+	p, err := redisqueue.NewProducerWithContextOptions(&redisqueue.ProducerOptions{
 		StreamMaxLength:      10000,
 		ApproximateMaxLength: true,
 	})
@@ -70,7 +71,7 @@ func main() {
 	}
 
 	for i := 0; i < 1000; i++ {
-		err := p.Enqueue(&redisqueue.Message{
+		err := p.EnqueueWithContext(ctx, &redisqueue.Message{
 			Stream: "redisqueue:test",
 			Values: map[string]interface{}{
 				"index": i,
@@ -100,7 +101,8 @@ import (
 )
 
 func main() {
-	c, err := redisqueue.NewConsumerWithOptions(&redisqueue.ConsumerOptions{
+	ctx := context.Background()
+	c, err := redisqueue.NewConsumerWithContextOptions(ctx, &redisqueue.ConsumerOptions{
 		VisibilityTimeout: 60 * time.Second,
 		BlockingTimeout:   5 * time.Second,
 		ReclaimInterval:   1 * time.Second,
@@ -121,7 +123,7 @@ func main() {
 	}()
 
 	fmt.Println("starting")
-	c.Run()
+	c.Run(ctx)
 	fmt.Println("stopped")
 }
 
