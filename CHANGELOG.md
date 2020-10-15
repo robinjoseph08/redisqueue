@@ -1,4 +1,12 @@
 
+<a name="v2.1.0"></a>
+## [v2.1.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v2.0.0...v2.1.0) (2020-10-15)
+
+### Features
+
+* **redis:** allow passing in redis.UniversalClient
+
+
 <a name="v2.0.0"></a>
 ## [v2.0.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v1.1.0...v2.0.0) (2020-05-26)
 
