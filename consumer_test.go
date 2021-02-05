@@ -1,11 +1,12 @@
 package redisqueue
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -156,8 +157,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{
@@ -200,8 +201,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg := &Message{
@@ -220,7 +221,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(context.TODO(), &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -263,8 +264,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg1 := &Message{
@@ -287,7 +288,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(context.TODO(), &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -312,7 +313,7 @@ func TestRun(t *testing.T) {
 		c.Run()
 
 		// check if the pending message is still there
-		pendingRes, err := c.redis.XPendingExt(&redis.XPendingExtArgs{
+		pendingRes, err := c.redis.XPendingExt(context.TODO(), &redis.XPendingExtArgs{
 			Stream: tt.Name(),
 			Group:  c.options.GroupName,
 			Start:  "-",
@@ -343,8 +344,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg := &Message{
@@ -361,7 +362,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(context.TODO(), &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -373,7 +374,7 @@ func TestRun(t *testing.T) {
 		require.Equal(tt, msg.ID, res[0].Messages[0].ID)
 
 		// delete the message
-		err = c.redis.XDel(tt.Name(), msg.ID).Err()
+		err = c.redis.XDel(context.TODO(), tt.Name(), msg.ID).Err()
 		require.NoError(tt, err)
 
 		// watch for consumer errors
@@ -392,7 +393,7 @@ func TestRun(t *testing.T) {
 		c.Run()
 
 		// check that there are no pending messages
-		pendingRes, err := c.redis.XPendingExt(&redis.XPendingExtArgs{
+		pendingRes, err := c.redis.XPendingExt(context.TODO(), &redis.XPendingExtArgs{
 			Stream: tt.Name(),
 			Group:  c.options.GroupName,
 			Start:  "-",
@@ -418,8 +419,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{
@@ -462,8 +463,8 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(context.TODO(), tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(context.TODO(), tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{
