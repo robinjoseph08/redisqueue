@@ -62,7 +62,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	p, err := redisqueue.NewProducerWithContextOptions(&redisqueue.ProducerOptions{
+	p, err := redisqueue.NewProducerWithContextOptions(ctx, &redisqueue.ProducerOptions{
 		StreamMaxLength:      10000,
 		ApproximateMaxLength: true,
 	})
