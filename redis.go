@@ -30,23 +30,9 @@ func newRedisClient(options *RedisOptions) *redis.Client {
 // to the actual instance and that the instance supports Redis streams (i.e.
 // it's at least v5).
 func redisPreflightChecks(client redis.UniversalClient) error {
-	info, err := client.Info("server").Result()
+	_, err := client.Ping().Result()
 	if err != nil {
 		return err
-	}
-
-	match := redisVersionRE.FindAllStringSubmatch(info, -1)
-	if len(match) < 1 {
-		return fmt.Errorf("could not extract redis version")
-	}
-	version := strings.TrimSpace(match[0][1])
-	parts := strings.Split(version, ".")
-	major, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return err
-	}
-	if major < 5 {
-		return fmt.Errorf("redis streams are not supported in version %q", version)
 	}
 
 	return nil
