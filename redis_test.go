@@ -1,6 +1,7 @@
 package redisqueue
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,14 +13,14 @@ func TestNewRedisClient(t *testing.T) {
 		options := &RedisOptions{}
 		r := newRedisClient(options)
 
-		err := r.Ping().Err()
+		err := r.Ping(context.TODO()).Err()
 		assert.NoError(tt, err)
 	})
 
 	t.Run("defaults options if it's nil", func(tt *testing.T) {
 		r := newRedisClient(nil)
 
-		err := r.Ping().Err()
+		err := r.Ping(context.TODO()).Err()
 		assert.NoError(tt, err)
 	})
 }
