@@ -1,11 +1,12 @@
 package redisqueue
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -128,6 +129,8 @@ func TestRegisterWithLastID(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	t.Run("sends an error if no ConsumerFuncs are registered", func(tt *testing.T) {
 		c, err := NewConsumer()
 		require.NoError(tt, err)
@@ -152,12 +155,12 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducer()
+		p, err := NewProducer(ctx)
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{
@@ -196,12 +199,12 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducer()
+		p, err := NewProducer(ctx)
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg := &Message{
@@ -220,7 +223,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -256,15 +259,15 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducerWithOptions(&ProducerOptions{
+		p, err := NewProducerWithOptions(ctx, &ProducerOptions{
 			StreamMaxLength:      2,
 			ApproximateMaxLength: false,
 		})
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg1 := &Message{
@@ -287,7 +290,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -312,7 +315,7 @@ func TestRun(t *testing.T) {
 		c.Run()
 
 		// check if the pending message is still there
-		pendingRes, err := c.redis.XPendingExt(&redis.XPendingExtArgs{
+		pendingRes, err := c.redis.XPendingExt(ctx, &redis.XPendingExtArgs{
 			Stream: tt.Name(),
 			Group:  c.options.GroupName,
 			Start:  "-",
@@ -336,15 +339,15 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducerWithOptions(&ProducerOptions{
+		p, err := NewProducerWithOptions(ctx, &ProducerOptions{
 			StreamMaxLength:      1,
 			ApproximateMaxLength: false,
 		})
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		msg := &Message{
@@ -361,7 +364,7 @@ func TestRun(t *testing.T) {
 		})
 
 		// read the message but don't acknowledge it
-		res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
+		res, err := c.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    c.options.GroupName,
 			Consumer: "failed_consumer",
 			Streams:  []string{tt.Name(), ">"},
@@ -373,7 +376,7 @@ func TestRun(t *testing.T) {
 		require.Equal(tt, msg.ID, res[0].Messages[0].ID)
 
 		// delete the message
-		err = c.redis.XDel(tt.Name(), msg.ID).Err()
+		err = c.redis.XDel(ctx, tt.Name(), msg.ID).Err()
 		require.NoError(tt, err)
 
 		// watch for consumer errors
@@ -392,7 +395,7 @@ func TestRun(t *testing.T) {
 		c.Run()
 
 		// check that there are no pending messages
-		pendingRes, err := c.redis.XPendingExt(&redis.XPendingExtArgs{
+		pendingRes, err := c.redis.XPendingExt(ctx, &redis.XPendingExtArgs{
 			Stream: tt.Name(),
 			Group:  c.options.GroupName,
 			Start:  "-",
@@ -414,12 +417,12 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducer()
+		p, err := NewProducer(ctx)
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{
@@ -458,12 +461,12 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// create a producer
-		p, err := NewProducer()
+		p, err := NewProducer(ctx)
 		require.NoError(tt, err)
 
 		// create consumer group
-		c.redis.XGroupDestroy(tt.Name(), c.options.GroupName)
-		c.redis.XGroupCreateMkStream(tt.Name(), c.options.GroupName, "$")
+		c.redis.XGroupDestroy(ctx, tt.Name(), c.options.GroupName)
+		c.redis.XGroupCreateMkStream(ctx, tt.Name(), c.options.GroupName, "$")
 
 		// enqueue a message
 		err = p.Enqueue(&Message{

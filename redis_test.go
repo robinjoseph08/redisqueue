@@ -1,6 +1,7 @@
 package redisqueue
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,18 +9,20 @@ import (
 )
 
 func TestNewRedisClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	t.Run("returns a new redis client", func(tt *testing.T) {
 		options := &RedisOptions{}
 		r := newRedisClient(options)
 
-		err := r.Ping().Err()
+		err := r.Ping(ctx).Err()
 		assert.NoError(tt, err)
 	})
 
 	t.Run("defaults options if it's nil", func(tt *testing.T) {
 		r := newRedisClient(nil)
 
-		err := r.Ping().Err()
+		err := r.Ping(ctx).Err()
 		assert.NoError(tt, err)
 	})
 }

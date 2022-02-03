@@ -1,7 +1,9 @@
 package redisqueue
 
 import (
-	"github.com/go-redis/redis/v7"
+	"context"
+
+	"github.com/go-redis/redis/v8"
 )
 
 // ProducerOptions provide options to configure the Producer.
@@ -36,6 +38,7 @@ type ProducerOptions struct {
 type Producer struct {
 	options *ProducerOptions
 	redis   redis.UniversalClient
+	ctx     context.Context
 }
 
 var defaultProducerOptions = &ProducerOptions{
@@ -46,12 +49,12 @@ var defaultProducerOptions = &ProducerOptions{
 // NewProducer uses a default set of options to create a Producer. It sets
 // StreamMaxLength to 1000 and ApproximateMaxLength to true. In most production
 // environments, you'll want to use NewProducerWithOptions.
-func NewProducer() (*Producer, error) {
-	return NewProducerWithOptions(defaultProducerOptions)
+func NewProducer(ctx context.Context) (*Producer, error) {
+	return NewProducerWithOptions(ctx, defaultProducerOptions)
 }
 
 // NewProducerWithOptions creates a Producer using custom ProducerOptions.
-func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
+func NewProducerWithOptions(ctx context.Context, options *ProducerOptions) (*Producer, error) {
 	var r redis.UniversalClient
 
 	if options.RedisClient != nil {
@@ -67,6 +70,7 @@ func NewProducerWithOptions(options *ProducerOptions) (*Producer, error) {
 	return &Producer{
 		options: options,
 		redis:   r,
+		ctx:     ctx,
 	}, nil
 }
 
@@ -85,7 +89,7 @@ func (p *Producer) Enqueue(msg *Message) error {
 	} else {
 		args.MaxLen = p.options.StreamMaxLength
 	}
-	id, err := p.redis.XAdd(args).Result()
+	id, err := p.redis.XAdd(p.ctx, args).Result()
 	if err != nil {
 		return err
 	}
