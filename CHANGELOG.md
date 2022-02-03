@@ -1,4 +1,11 @@
 
+<a name="v3.0.0"></a>
+## [v2.1.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v2.1.0...v3.0.0) (2020-10-15)
+
+### Features
+
+* **redis:** updated redis client library to v8
+
 <a name="v2.1.0"></a>
 ## [v2.1.0](https://github.com/robinjoseph08/go-pg-migrations/compare/v2.0.0...v2.1.0) (2020-10-15)
 
