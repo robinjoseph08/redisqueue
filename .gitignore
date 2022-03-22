@@ -63,5 +63,9 @@ Session.vim
 # auto-generated tag files
 tags
 
+### goland ###
+.idea
+### vscode ###
+.vscode
 
 # End of https://www.gitignore.io/api/go,vim,macos

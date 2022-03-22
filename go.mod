@@ -3,11 +3,9 @@ module github.com/robinjoseph08/redisqueue/v2
 go 1.12
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/git-chglog/git-chglog v0.0.0-20190611050339-63a4e637021f
-	github.com/go-redis/redis/v7 v7.3.0
-	github.com/golang/protobuf v1.3.3 // indirect
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/goveralls v0.0.2
@@ -16,8 +14,6 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/tsuyoshiwada/go-gitcmd v0.0.0-20180205145712-5f1f5f9475df // indirect
 	github.com/urfave/cli v1.20.0 // indirect
-	golang.org/x/tools v0.0.0-20190706070813-72ffa07ba3db // indirect
 	gopkg.in/AlecAivazis/survey.v1 v1.8.5 // indirect
 	gopkg.in/kyokomi/emoji.v1 v1.5.1 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

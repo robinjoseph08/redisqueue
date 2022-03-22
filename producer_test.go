@@ -1,6 +1,7 @@
 package redisqueue
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,7 @@ func TestEnqueue(t *testing.T) {
 		err = p.Enqueue(msg)
 		require.NoError(tt, err)
 
-		res, err := p.redis.XRange(msg.Stream, msg.ID, msg.ID).Result()
+		res, err := p.redis.XRange(context.TODO(), msg.Stream, msg.ID, msg.ID).Result()
 		require.NoError(tt, err)
 		assert.Equal(tt, "value", res[0].Values["test"])
 	})
