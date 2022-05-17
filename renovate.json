@@ -1,5 +1,19 @@
 {
   "extends": [
-    "config:base"
-  ]
+      "config:base",
+      "group:recommended"
+  ],
+  "assigneesFromCodeOwners": true,
+  "assigneesSampleSize": 1,
+  "dependencyDashboard": true,
+  "hostRules": [{
+      "domainName": "github.com",
+      "encrypted": {
+          "token": "ZrS/eXMjXucuUL3jsz2TdkbfG9LJFI1IXxX3eqHmK0LvhaIS2oE7gC5jmU/Z6n0JmoQW2/Y7xVPni5gpsQ/DsdFjUfD9w/NHsYrmjzfPM8rWgymoHCANkxvmm1c7KlMHyjIQ8H1aN4Hizzze+q51hxzdLFjCzo2f/LADw5z+7t5vIU20xmo9h1346tFYiOSdZ7Dx6kiji7sxEey0gHE86rjb9yPW4Kz4c4e6NNLf5EZ2l00Sog5a0Czb7oSNerT5uT76VRMLv+lTEdtu8/8SWgsZ2BUqfB31GCxtswiD8kxKg621gXK8WtYce6IFCpe4SixNrE1fhMlzJyM8JuIwAA=="
+      }
+  }],
+  "postUpdateOptions": ["gomodTidy"],
+  "vulnerabilityAlerts": {
+      "labels": ["security"]
+  }
 }
