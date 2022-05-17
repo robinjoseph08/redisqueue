@@ -1,12 +1,13 @@
 package redisqueue
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 )
 
@@ -29,8 +30,8 @@ func newRedisClient(options *RedisOptions) *redis.Client {
 // offers the functionality we need. Specifically, it also that it can connect
 // to the actual instance and that the instance supports Redis streams (i.e.
 // it's at least v5).
-func redisPreflightChecks(client redis.UniversalClient) error {
-	info, err := client.Info("server").Result()
+func redisPreflightChecks(ctx context.Context, client redis.UniversalClient) error {
+	info, err := client.Info(ctx, "server").Result()
 	if err != nil {
 		return err
 	}
