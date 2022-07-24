@@ -303,7 +303,7 @@ func (c *Consumer) reclaim() {
 									continue
 								}
 							}
-							c.enqueue(stream, claimres)
+							c.enqueue(stream, claimres, r.RetryCount)
 						}
 					}
 
@@ -354,7 +354,7 @@ func (c *Consumer) poll() {
 			}
 
 			for _, r := range res {
-				c.enqueue(r.Stream, r.Messages)
+				c.enqueue(r.Stream, r.Messages, 0)
 			}
 		}
 	}
@@ -362,12 +362,13 @@ func (c *Consumer) poll() {
 
 // enqueue takes a slice of XMessages, creates corresponding Messages, and sends
 // them on the centralized channel for worker goroutines to process.
-func (c *Consumer) enqueue(stream string, msgs []redis.XMessage) {
+func (c *Consumer) enqueue(stream string, msgs []redis.XMessage, retryCnt int64) {
 	for _, m := range msgs {
 		msg := &Message{
-			ID:     m.ID,
-			Stream: stream,
-			Values: m.Values,
+			ID:         m.ID,
+			RetryCount: retryCnt,
+			Stream:     stream,
+			Values:     m.Values,
 		}
 		c.queue <- msg
 	}
