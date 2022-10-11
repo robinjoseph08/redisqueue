@@ -2,6 +2,7 @@ package redisqueue
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -183,7 +184,7 @@ func (c *Consumer) Register(stream string, fn ConsumerFunc) {
 // Run will terminate early. The same will happen if an error occurs when
 // creating the consumer group in Redis. Run will block until Shutdown is called
 // and all of the in-flight messages have been processed.
-func (c *Consumer) Run() {
+func (c *Consumer) Run(ctx context.Context) {
 	if len(c.consumers) == 0 {
 		c.Errors <- errors.New("at least one consumer function needs to be registered")
 		return
@@ -191,7 +192,7 @@ func (c *Consumer) Run() {
 
 	for stream, consumer := range c.consumers {
 		c.streams = append(c.streams, stream)
-		err := c.redis.XGroupCreateMkStream(context.Background(), stream, c.options.GroupName, consumer.id).Err()
+		err := c.redis.XGroupCreateMkStream(ctx, stream, c.options.GroupName, consumer.id).Err()
 		// ignoring the BUSYGROUP error makes this a noop
 		if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
 			c.Errors <- errors.Wrap(err, "error creating consumer group")
@@ -218,6 +219,32 @@ func (c *Consumer) Run() {
 		go c.work()
 	}
 
+	// prune old inactive consumers
+	for stream := range c.consumers {
+		cu := c.redis.XInfoConsumers(ctx, stream, c.options.GroupName)
+		cs, err := cu.Result()
+		if err != nil {
+			c.Errors <- errors.New(fmt.Sprintf("failed to list consumers for stream: %q group: %q", stream, c.options.GroupName))
+			continue
+		}
+		for _, consumer := range cs {
+			if consumer.Pending == 0 && consumer.Idle > time.Hour.Milliseconds()*24 {
+				rCmd := c.redis.XGroupDelConsumer(ctx, stream, c.options.GroupName, consumer.Name)
+				pendingMsgCount, err := rCmd.Result()
+				if err != nil {
+					c.Errors <- errors.New(fmt.Sprintf("failed to remove consumer: %q for stream: %q group: %q", consumer.Name, stream, c.options.GroupName))
+				}
+				if pendingMsgCount > 0 {
+					c.Errors <- errors.New(fmt.Sprintf("remove consumer: %q with pending messages: %d for stream: %q group: %q", consumer.Name, pendingMsgCount, stream, c.options.GroupName))
+				}
+			}
+
+			// prevent ddos on redis
+			time.Sleep(1 * time.Second)
+		}
+	}
+
+	// blocking, waiting for shutdown
 	c.wg.Wait()
 }
 

@@ -139,7 +139,7 @@ func TestRun(t *testing.T) {
 			assert.Equal(tt, "at least one consumer function needs to be registered", err.Error())
 		}()
 
-		c.Run()
+		c.Run(context.Background())
 	})
 
 	t.Run("calls the ConsumerFunc on for a message", func(tt *testing.T) {
@@ -182,7 +182,7 @@ func TestRun(t *testing.T) {
 		}()
 
 		// run the consumer
-		c.Run()
+		c.Run(context.Background())
 	})
 
 	t.Run("reclaims pending messages according to ReclaimInterval", func(tt *testing.T) {
@@ -243,7 +243,7 @@ func TestRun(t *testing.T) {
 		}()
 
 		// run the consumer
-		c.Run()
+		c.Run(context.Background())
 	})
 
 	t.Run("doesn't reclaim if there is no VisibilityTimeout set", func(tt *testing.T) {
@@ -310,7 +310,7 @@ func TestRun(t *testing.T) {
 		}()
 
 		// run the consumer
-		c.Run()
+		c.Run(context.Background())
 
 		// check if the pending message is still there
 		pendingRes, err := c.redis.XPendingExt(context.Background(), &redis.XPendingExtArgs{
@@ -445,7 +445,7 @@ func TestRun(t *testing.T) {
 		}()
 
 		// run the consumer
-		c.Run()
+		c.Run(context.Background())
 	})
 
 	t.Run("returns an error on an error panic", func(tt *testing.T) {
@@ -489,6 +489,6 @@ func TestRun(t *testing.T) {
 		}()
 
 		// run the consumer
-		c.Run()
+		c.Run(context.Background())
 	})
 }
