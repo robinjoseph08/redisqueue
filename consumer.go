@@ -3,6 +3,7 @@ package redisqueue
 import (
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -97,7 +98,6 @@ type Consumer struct {
 
 	stopReclaim chan struct{}
 	stopPoll    chan struct{}
-	stopWorkers chan struct{}
 }
 
 var defaultConsumerOptions = &ConsumerOptions{
@@ -160,7 +160,6 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 
 		stopReclaim: make(chan struct{}, 1),
 		stopPoll:    make(chan struct{}, 1),
-		stopWorkers: make(chan struct{}, options.Concurrency),
 	}, nil
 }
 
@@ -280,9 +279,15 @@ func (c *Consumer) reclaim() {
 						End:    end,
 						Count:  int64(c.options.BufferSize - len(c.queue)),
 					}).Result()
-					if err != nil && err != redis.Nil {
-						c.Errors <- errors.Wrap(err, "error listing pending messages")
-						break
+					if err != nil {
+						if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
+							break
+						}
+
+						if err != redis.Nil {
+							c.Errors <- errors.Wrap(err, "error listing pending messages")
+							break
+						}
 					}
 
 					if len(res) == 0 {
@@ -372,6 +377,10 @@ func (c *Consumer) doReceive(consumer *registeredConsumer) {
 					continue
 				}
 				if err == redis.Nil {
+					continue
+				}
+				if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
+					time.Sleep(c.options.BlockingTimeout)
 					continue
 				}
 				c.Errors <- errors.Wrap(err, "error reading redis stream:")
