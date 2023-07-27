@@ -11,6 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testStream string
+
+func (s testStream) GetQueue() string {
+	return string(s)
+}
+
+func (s testStream) GetConcurrency() int {
+	return 0
+}
+
 func TestNewConsumer(t *testing.T) {
 	t.Run("creates a new consumer", func(tt *testing.T) {
 		c, err := NewConsumer()
@@ -79,7 +89,7 @@ func TestRegister(t *testing.T) {
 		c, err := NewConsumer()
 		require.NoError(tt, err)
 
-		c.Register(tt.Name(), fn)
+		c.Register(testStream(tt.Name()), fn)
 
 		assert.Len(tt, c.consumers, 1)
 	})
@@ -117,7 +127,7 @@ func TestRegisterWithLastID(t *testing.T) {
 			c, err := NewConsumer()
 			require.NoError(t, err)
 
-			c.RegisterWithLastID("test", tt.id, fn)
+			c.RegisterWithLastID(testStream("test"), tt.id, fn)
 
 			assert.Len(t, c.consumers, 1)
 			assert.Contains(t, c.consumers, "test")
@@ -168,7 +178,7 @@ func TestRun(t *testing.T) {
 
 		// register a handler that will assert the message and then shut down
 		// the consumer
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			assert.Equal(tt, "value", m.Values["test"])
 			c.Shutdown()
 			return nil
@@ -213,7 +223,7 @@ func TestRun(t *testing.T) {
 
 		// register a handler that will assert the message and then shut down
 		// the consumer
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			assert.Equal(tt, msg.ID, m.ID)
 			c.Shutdown()
 			return nil
@@ -280,7 +290,7 @@ func TestRun(t *testing.T) {
 
 		// register a handler that will assert the message and then shut down
 		// the consumer
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			assert.Equal(tt, msg2.ID, m.ID)
 			c.Shutdown()
 			return nil
@@ -355,7 +365,7 @@ func TestRun(t *testing.T) {
 		require.NoError(tt, err)
 
 		// register a noop handler that should never be called
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			t.Fail()
 			return nil
 		})
@@ -430,7 +440,7 @@ func TestRun(t *testing.T) {
 
 		// register a handler that will assert the message, shut down the
 		// consumer, and then panic with a string
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			assert.Equal(tt, "value", m.Values["test"])
 			c.Shutdown()
 			panic("this is a panic")
@@ -474,7 +484,7 @@ func TestRun(t *testing.T) {
 
 		// register a handler that will assert the message, shut down the
 		// consumer, and then panic with an error
-		c.Register(tt.Name(), func(m *Message) error {
+		c.Register(testStream(tt.Name()), func(m *Message) error {
 			assert.Equal(tt, "value", m.Values["test"])
 			c.Shutdown()
 			panic(errors.New("this is a panic"))
