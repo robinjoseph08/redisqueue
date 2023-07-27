@@ -349,22 +349,24 @@ func (c *Consumer) poll() {
 }
 
 func (c *Consumer) doReceive(consumer *registeredConsumer) {
-	streams := []string{consumer.GetQueue()}
+	streams := []string{consumer.GetQueue(), ">"}
 
 	go c.work(consumer)
+
+	readArgs := &redis.XReadGroupArgs{
+		Group:    c.options.GroupName,
+		Consumer: c.options.Name,
+		Streams:  streams,
+		Block:    c.options.BlockingTimeout,
+	}
 
 	for {
 		select {
 		case <-c.stopPoll:
 			return
 		default:
-			res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
-				Group:    c.options.GroupName,
-				Consumer: c.options.Name,
-				Streams:  streams,
-				Count:    int64(c.options.BufferSize - len(consumer.msgChan)),
-				Block:    c.options.BlockingTimeout,
-			}).Result()
+			readArgs.Count = int64(c.options.BufferSize - len(consumer.msgChan))
+			res, err := c.redis.XReadGroup(readArgs).Result()
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					continue
