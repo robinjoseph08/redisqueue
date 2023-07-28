@@ -93,8 +93,8 @@ type Consumer struct {
 	redis     redis.UniversalClient
 	consumers map[string]registeredConsumer
 	//streams   []string
-	queue chan *Message
-	wg    *sync.WaitGroup
+	//queue chan *Message
+	wg *sync.WaitGroup
 
 	stopReclaim chan struct{}
 	stopPoll    chan struct{}
@@ -155,8 +155,8 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 		redis:     r,
 		consumers: make(map[string]registeredConsumer),
 		//streams:   make([]string, 0),
-		queue: make(chan *Message, options.BufferSize),
-		wg:    &sync.WaitGroup{},
+		//queue: make(chan *Message, options.BufferSize),
+		wg: &sync.WaitGroup{},
 
 		stopReclaim: make(chan struct{}, 1),
 		stopPoll:    make(chan struct{}, 1),
@@ -207,8 +207,6 @@ func (c *Consumer) Run() {
 		c.Errors <- errors.New("at least one consumer function needs to be registered")
 		return
 	}
-
-	c.wg.Add(len(c.consumers))
 
 	for stream, consumer := range c.consumers {
 		//c.streams = append(c.streams, stream)
@@ -277,7 +275,7 @@ func (c *Consumer) reclaim() {
 						Group:  c.options.GroupName,
 						Start:  start,
 						End:    end,
-						Count:  int64(c.options.BufferSize - len(c.queue)),
+						Count:  int64(c.options.BufferSize - len(cmgr.msgChan)),
 					}).Result()
 					if err != nil {
 						if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
@@ -355,8 +353,11 @@ func (c *Consumer) poll() {
 
 func (c *Consumer) doReceive(consumer *registeredConsumer) {
 	streams := []string{consumer.GetQueue(), ">"}
-
-	go c.work(consumer)
+	c.wg.Add(consumer.concurrency)
+	//创建并发线程
+	for i := 0; i < consumer.concurrency; i++ {
+		go c.work(consumer)
+	}
 
 	readArgs := &redis.XReadGroupArgs{
 		Group:    c.options.GroupName,
@@ -398,13 +399,12 @@ func (c *Consumer) doReceive(consumer *registeredConsumer) {
 // them on the centralized channel for worker goroutines to process.
 func (c *Consumer) enqueue(stream *registeredConsumer, msgs []redis.XMessage, retryCnt int64) {
 	for _, m := range msgs {
-		msg := &Message{
+		stream.msgChan <- &Message{
 			ID:         m.ID,
 			RetryCount: retryCnt,
 			Stream:     stream.GetQueue(),
 			Values:     m.Values,
 		}
-		c.queue <- msg
 	}
 }
 
@@ -414,9 +414,7 @@ func (c *Consumer) enqueue(stream *registeredConsumer, msgs []redis.XMessage, re
 // came from. If no error is returned from the ConsumerFunc, the message is
 // acknowledged in Redis.
 func (c *Consumer) work(stream *registeredConsumer) {
-	defer func() {
-		c.wg.Done()
-	}()
+	defer c.wg.Done()
 
 	for {
 		select {
