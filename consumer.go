@@ -91,7 +91,7 @@ type Consumer struct {
 
 	options   *ConsumerOptions
 	redis     redis.UniversalClient
-	consumers map[string]registeredConsumer
+	consumers map[string]*registeredConsumer
 	//streams   []string
 	//queue chan *Message
 	wg *sync.WaitGroup
@@ -153,7 +153,7 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 
 		options:   options,
 		redis:     r,
-		consumers: make(map[string]registeredConsumer),
+		consumers: make(map[string]*registeredConsumer),
 		//streams:   make([]string, 0),
 		//queue: make(chan *Message, options.BufferSize),
 		wg: &sync.WaitGroup{},
@@ -179,7 +179,7 @@ func (c *Consumer) RegisterWithLastID(stream StreamItem, id string, fn ConsumerF
 	if concurrency == 0 {
 		concurrency = c.options.Concurrency
 	}
-	c.consumers[stream.GetQueue()] = registeredConsumer{
+	c.consumers[stream.GetQueue()] = &registeredConsumer{
 		item:        stream,
 		fn:          fn,
 		id:          id,
@@ -324,7 +324,7 @@ func (c *Consumer) reclaim() {
 								}
 							}
 							//lcmgr.
-							c.enqueue(&cmgr, claimres, r.RetryCount)
+							c.enqueue(cmgr, claimres, r.RetryCount)
 						}
 					}
 
@@ -346,8 +346,10 @@ func (c *Consumer) reclaim() {
 // of blocking indefinitely so that it can periodically check to see if Shutdown
 // was called.
 func (c *Consumer) poll() {
-	for _, consumer := range c.consumers {
-		go c.doReceive(&consumer) //只有一次循环，不会造成内存重复copy
+	for k := range c.consumers {
+		go func(item *registeredConsumer) {
+			c.doReceive(item) //只有一次循环，不会造成内存重复copy
+		}(c.consumers[k])
 	}
 }
 
