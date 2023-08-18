@@ -3,6 +3,7 @@ package redisqueue
 import (
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,8 +16,22 @@ import (
 type ConsumerFunc func(*Message) error
 
 type registeredConsumer struct {
-	fn ConsumerFunc
-	id string
+	item        StreamItem
+	fn          ConsumerFunc
+	id          string
+	concurrency int
+	msgChan     chan *Message
+}
+
+func (r registeredConsumer) GetQueue() string {
+	return r.item.GetQueue()
+}
+
+func (r registeredConsumer) GetConcurrency() int {
+	if r.concurrency == 0 {
+		return r.item.GetConcurrency()
+	}
+	return r.concurrency
 }
 
 // ConsumerOptions provide options to configure the Consumer.
@@ -76,14 +91,13 @@ type Consumer struct {
 
 	options   *ConsumerOptions
 	redis     redis.UniversalClient
-	consumers map[string]registeredConsumer
-	streams   []string
-	queue     chan *Message
-	wg        *sync.WaitGroup
+	consumers map[string]*registeredConsumer
+	//streams   []string
+	//queue chan *Message
+	wg *sync.WaitGroup
 
 	stopReclaim chan struct{}
 	stopPoll    chan struct{}
-	stopWorkers chan struct{}
 }
 
 var defaultConsumerOptions = &ConsumerOptions{
@@ -139,14 +153,13 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 
 		options:   options,
 		redis:     r,
-		consumers: make(map[string]registeredConsumer),
-		streams:   make([]string, 0),
-		queue:     make(chan *Message, options.BufferSize),
-		wg:        &sync.WaitGroup{},
+		consumers: make(map[string]*registeredConsumer),
+		//streams:   make([]string, 0),
+		//queue: make(chan *Message, options.BufferSize),
+		wg: &sync.WaitGroup{},
 
 		stopReclaim: make(chan struct{}, 1),
 		stopPoll:    make(chan struct{}, 1),
-		stopWorkers: make(chan struct{}, options.Concurrency),
 	}, nil
 }
 
@@ -157,14 +170,21 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 //
 // If the consumer group already exists the id field is ignored, meaning you'll
 // receive unprocessed messages.
-func (c *Consumer) RegisterWithLastID(stream string, id string, fn ConsumerFunc) {
+func (c *Consumer) RegisterWithLastID(stream StreamItem, id string, fn ConsumerFunc) {
 	if len(id) == 0 {
 		id = "0"
 	}
 
-	c.consumers[stream] = registeredConsumer{
-		fn: fn,
-		id: id,
+	concurrency := stream.GetConcurrency()
+	if concurrency == 0 {
+		concurrency = c.options.Concurrency
+	}
+	c.consumers[stream.GetQueue()] = &registeredConsumer{
+		item:        stream,
+		fn:          fn,
+		id:          id,
+		concurrency: concurrency,
+		msgChan:     make(chan *Message, concurrency),
 	}
 }
 
@@ -172,7 +192,7 @@ func (c *Consumer) RegisterWithLastID(stream string, id string, fn ConsumerFunc)
 // message comes in from that stream. Register must be called at least once
 // before Run is called. If the same stream name is passed in twice, the first
 // ConsumerFunc is overwritten by the second.
-func (c *Consumer) Register(stream string, fn ConsumerFunc) {
+func (c *Consumer) Register(stream StreamItem, fn ConsumerFunc) {
 	c.RegisterWithLastID(stream, "0", fn)
 }
 
@@ -189,7 +209,7 @@ func (c *Consumer) Run() {
 	}
 
 	for stream, consumer := range c.consumers {
-		c.streams = append(c.streams, stream)
+		//c.streams = append(c.streams, stream)
 		err := c.redis.XGroupCreateMkStream(stream, c.options.GroupName, consumer.id).Err()
 		// ignoring the BUSYGROUP error makes this a noop
 		if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
@@ -198,9 +218,9 @@ func (c *Consumer) Run() {
 		}
 	}
 
-	for i := 0; i < len(c.consumers); i++ {
-		c.streams = append(c.streams, ">")
-	}
+	// for i := 0; i < len(c.consumers); i++ {
+	// 	c.streams = append(c.streams, ">")
+	// }
 
 	go c.reclaim()
 	go c.poll()
@@ -210,12 +230,6 @@ func (c *Consumer) Run() {
 		<-stop
 		c.Shutdown()
 	}()
-
-	c.wg.Add(c.options.Concurrency)
-
-	for i := 0; i < c.options.Concurrency; i++ {
-		go c.work()
-	}
 
 	c.wg.Wait()
 }
@@ -251,7 +265,7 @@ func (c *Consumer) reclaim() {
 			c.stopPoll <- struct{}{}
 			return
 		case <-ticker.C:
-			for stream := range c.consumers {
+			for stream, cmgr := range c.consumers {
 				start := "-"
 				end := "+"
 
@@ -261,11 +275,17 @@ func (c *Consumer) reclaim() {
 						Group:  c.options.GroupName,
 						Start:  start,
 						End:    end,
-						Count:  int64(c.options.BufferSize - len(c.queue)),
+						Count:  int64(c.options.BufferSize - len(cmgr.msgChan)),
 					}).Result()
-					if err != nil && err != redis.Nil {
-						c.Errors <- errors.Wrap(err, "error listing pending messages")
-						break
+					if err != nil {
+						if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
+							break
+						}
+
+						if err != redis.Nil {
+							c.Errors <- errors.Wrap(err, "error listing pending messages")
+							break
+						}
 					}
 
 					if len(res) == 0 {
@@ -303,7 +323,8 @@ func (c *Consumer) reclaim() {
 									continue
 								}
 							}
-							c.enqueue(stream, claimres)
+							//lcmgr.
+							c.enqueue(cmgr, claimres, r.RetryCount)
 						}
 					}
 
@@ -325,23 +346,35 @@ func (c *Consumer) reclaim() {
 // of blocking indefinitely so that it can periodically check to see if Shutdown
 // was called.
 func (c *Consumer) poll() {
+	for k := range c.consumers {
+		go func(item *registeredConsumer) {
+			c.doReceive(item) //只有一次循环，不会造成内存重复copy
+		}(c.consumers[k])
+	}
+}
+
+func (c *Consumer) doReceive(consumer *registeredConsumer) {
+	streams := []string{consumer.GetQueue(), ">"}
+	c.wg.Add(consumer.concurrency)
+	//创建并发线程
+	for i := 0; i < consumer.concurrency; i++ {
+		go c.work(consumer)
+	}
+
+	readArgs := &redis.XReadGroupArgs{
+		Group:    c.options.GroupName,
+		Consumer: c.options.Name,
+		Streams:  streams,
+		Block:    c.options.BlockingTimeout,
+	}
+
 	for {
 		select {
 		case <-c.stopPoll:
-			// once the polling has stopped (i.e. there will be no more messages
-			// put onto c.queue), stop all of the workers
-			for i := 0; i < c.options.Concurrency; i++ {
-				c.stopWorkers <- struct{}{}
-			}
 			return
 		default:
-			res, err := c.redis.XReadGroup(&redis.XReadGroupArgs{
-				Group:    c.options.GroupName,
-				Consumer: c.options.Name,
-				Streams:  c.streams,
-				Count:    int64(c.options.BufferSize - len(c.queue)),
-				Block:    c.options.BlockingTimeout,
-			}).Result()
+			readArgs.Count = int64(c.options.BufferSize - len(consumer.msgChan))
+			res, err := c.redis.XReadGroup(readArgs).Result()
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					continue
@@ -349,12 +382,16 @@ func (c *Consumer) poll() {
 				if err == redis.Nil {
 					continue
 				}
-				c.Errors <- errors.Wrap(err, "error reading redis stream")
+				if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
+					time.Sleep(c.options.BlockingTimeout)
+					continue
+				}
+				c.Errors <- errors.Wrap(err, "error reading redis stream:")
 				continue
 			}
 
 			for _, r := range res {
-				c.enqueue(r.Stream, r.Messages)
+				c.enqueue(consumer, r.Messages, 0)
 			}
 		}
 	}
@@ -362,14 +399,14 @@ func (c *Consumer) poll() {
 
 // enqueue takes a slice of XMessages, creates corresponding Messages, and sends
 // them on the centralized channel for worker goroutines to process.
-func (c *Consumer) enqueue(stream string, msgs []redis.XMessage) {
+func (c *Consumer) enqueue(stream *registeredConsumer, msgs []redis.XMessage, retryCnt int64) {
 	for _, m := range msgs {
-		msg := &Message{
-			ID:     m.ID,
-			Stream: stream,
-			Values: m.Values,
+		stream.msgChan <- &Message{
+			ID:         m.ID,
+			RetryCount: retryCnt,
+			Stream:     stream.GetQueue(),
+			Values:     m.Values,
 		}
-		c.queue <- msg
 	}
 }
 
@@ -378,12 +415,12 @@ func (c *Consumer) enqueue(stream string, msgs []redis.XMessage) {
 // channel, it calls the corrensponding ConsumerFunc depending on the stream it
 // came from. If no error is returned from the ConsumerFunc, the message is
 // acknowledged in Redis.
-func (c *Consumer) work() {
+func (c *Consumer) work(stream *registeredConsumer) {
 	defer c.wg.Done()
 
 	for {
 		select {
-		case msg := <-c.queue:
+		case msg := <-stream.msgChan:
 			err := c.process(msg)
 			if err != nil {
 				c.Errors <- errors.Wrapf(err, "error calling ConsumerFunc for %q stream and %q message", msg.Stream, msg.ID)
@@ -394,7 +431,7 @@ func (c *Consumer) work() {
 				c.Errors <- errors.Wrapf(err, "error acknowledging after success for %q stream and %q message", msg.Stream, msg.ID)
 				continue
 			}
-		case <-c.stopWorkers:
+		case <-c.stopPoll:
 			return
 		}
 	}
