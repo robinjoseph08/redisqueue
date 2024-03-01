@@ -16,22 +16,17 @@ import (
 type ConsumerFunc func(*Message) error
 
 type registeredConsumer struct {
-	item        StreamItem
-	fn          ConsumerFunc
-	id          string
-	concurrency int
-	msgChan     chan *Message
+	item              StreamItem
+	fn                ConsumerFunc
+	id                string
+	msgChan           chan *Message
+	visibilityTimeout time.Duration
+	concurrency       int
+	bufferSize        int
 }
 
 func (r registeredConsumer) GetQueue() string {
 	return r.item.GetQueue()
-}
-
-func (r registeredConsumer) GetConcurrency() int {
-	if r.concurrency == 0 {
-		return r.item.GetConcurrency()
-	}
-	return r.concurrency
 }
 
 // ConsumerOptions provide options to configure the Consumer.
@@ -154,9 +149,7 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 		options:   options,
 		redis:     r,
 		consumers: make(map[string]*registeredConsumer),
-		//streams:   make([]string, 0),
-		//queue: make(chan *Message, options.BufferSize),
-		wg: &sync.WaitGroup{},
+		wg:        &sync.WaitGroup{},
 
 		stopReclaim: make(chan struct{}, 1),
 		stopPoll:    make(chan struct{}, 1),
@@ -179,12 +172,25 @@ func (c *Consumer) RegisterWithLastID(stream StreamItem, id string, fn ConsumerF
 	if concurrency == 0 {
 		concurrency = c.options.Concurrency
 	}
+
+	visibilityTimeout := stream.GetVisibilityTimeout()
+	if visibilityTimeout == 0 {
+		visibilityTimeout = c.options.VisibilityTimeout
+	}
+
+	bufferSize := stream.GetBufferSize()
+	if bufferSize == 0 {
+		bufferSize = c.options.BufferSize
+	}
+
 	c.consumers[stream.GetQueue()] = &registeredConsumer{
-		item:        stream,
-		fn:          fn,
-		id:          id,
-		concurrency: concurrency,
-		msgChan:     make(chan *Message, concurrency),
+		item:              stream,
+		fn:                fn,
+		id:                id,
+		msgChan:           make(chan *Message, concurrency),
+		concurrency:       concurrency,
+		visibilityTimeout: visibilityTimeout,
+		bufferSize:        bufferSize,
 	}
 }
 
@@ -241,7 +247,7 @@ func (c *Consumer) Run() {
 func (c *Consumer) Shutdown() {
 	c.stopReclaim <- struct{}{}
 	if c.options.VisibilityTimeout == 0 {
-		c.stopPoll <- struct{}{}
+		close(c.stopPoll)
 	}
 }
 
@@ -262,12 +268,12 @@ func (c *Consumer) reclaim() {
 		select {
 		case <-c.stopReclaim:
 			// once the reclaim process has stopped, stop the polling process
-			c.stopPoll <- struct{}{}
+			close(c.stopPoll)
 			return
 		case <-ticker.C:
 			for stream, cmgr := range c.consumers {
-				start := "-"
-				end := "+"
+				var start = "-"
+				var end = "+"
 
 				for {
 					res, err := c.redis.XPendingExt(&redis.XPendingExtArgs{
@@ -275,7 +281,7 @@ func (c *Consumer) reclaim() {
 						Group:  c.options.GroupName,
 						Start:  start,
 						End:    end,
-						Count:  int64(c.options.BufferSize - len(cmgr.msgChan)),
+						Count:  int64(cmgr.bufferSize - len(cmgr.msgChan)),
 					}).Result()
 					if err != nil {
 						if strings.HasPrefix(err.Error(), "NOGROUP No such key") {
@@ -295,12 +301,12 @@ func (c *Consumer) reclaim() {
 					msgs := make([]string, 0)
 
 					for _, r := range res {
-						if r.Idle >= c.options.VisibilityTimeout {
+						if r.Idle >= cmgr.visibilityTimeout {
 							claimres, err := c.redis.XClaim(&redis.XClaimArgs{
 								Stream:   stream,
 								Group:    c.options.GroupName,
 								Consumer: c.options.Name,
-								MinIdle:  c.options.VisibilityTimeout,
+								MinIdle:  cmgr.visibilityTimeout,
 								Messages: []string{r.ID},
 							}).Result()
 							if err != nil && err != redis.Nil {
@@ -373,7 +379,7 @@ func (c *Consumer) doReceive(consumer *registeredConsumer) {
 		case <-c.stopPoll:
 			return
 		default:
-			readArgs.Count = int64(c.options.BufferSize - len(consumer.msgChan))
+			readArgs.Count = int64(consumer.bufferSize - len(consumer.msgChan))
 			res, err := c.redis.XReadGroup(readArgs).Result()
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {

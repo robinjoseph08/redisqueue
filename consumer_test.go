@@ -21,6 +21,14 @@ func (s testStream) GetConcurrency() int {
 	return 0
 }
 
+func (s testStream) GetVisibilityTimeout() time.Duration {
+	return 0
+}
+
+func (s testStream) GetBufferSize() int {
+	return 0
+}
+
 func TestNewConsumer(t *testing.T) {
 	t.Run("creates a new consumer", func(tt *testing.T) {
 		c, err := NewConsumer()
