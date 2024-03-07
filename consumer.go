@@ -87,12 +87,8 @@ type Consumer struct {
 	options   *ConsumerOptions
 	redis     redis.UniversalClient
 	consumers map[string]*registeredConsumer
-	//streams   []string
-	//queue chan *Message
-	wg *sync.WaitGroup
-
-	stopReclaim chan struct{}
-	stopPoll    chan struct{}
+	wg        *sync.WaitGroup
+	closeChan chan struct{}
 }
 
 var defaultConsumerOptions = &ConsumerOptions{
@@ -150,9 +146,7 @@ func NewConsumerWithOptions(options *ConsumerOptions) (*Consumer, error) {
 		redis:     r,
 		consumers: make(map[string]*registeredConsumer),
 		wg:        &sync.WaitGroup{},
-
-		stopReclaim: make(chan struct{}, 1),
-		stopPoll:    make(chan struct{}, 1),
+		closeChan: make(chan struct{}),
 	}, nil
 }
 
@@ -245,10 +239,7 @@ func (c *Consumer) Run() {
 // The order that things stop is 1) the reclaim process (if it's running), 2)
 // the polling process, and 3) the worker processes.
 func (c *Consumer) Shutdown() {
-	c.stopReclaim <- struct{}{}
-	if c.options.VisibilityTimeout == 0 {
-		close(c.stopPoll)
-	}
+	close(c.closeChan)
 }
 
 // reclaim runs in a separate goroutine and checks the list of pending messages
@@ -266,9 +257,7 @@ func (c *Consumer) reclaim() {
 
 	for {
 		select {
-		case <-c.stopReclaim:
-			// once the reclaim process has stopped, stop the polling process
-			close(c.stopPoll)
+		case <-c.closeChan:
 			return
 		case <-ticker.C:
 			for stream, cmgr := range c.consumers {
@@ -376,7 +365,8 @@ func (c *Consumer) doReceive(consumer *registeredConsumer) {
 
 	for {
 		select {
-		case <-c.stopPoll:
+		case <-c.closeChan:
+			close(consumer.msgChan)
 			return
 		default:
 			readArgs.Count = int64(consumer.bufferSize - len(consumer.msgChan))
@@ -424,23 +414,19 @@ func (c *Consumer) enqueue(stream *registeredConsumer, msgs []redis.XMessage, re
 func (c *Consumer) work(stream *registeredConsumer) {
 	defer c.wg.Done()
 
-	for {
-		select {
-		case msg := <-stream.msgChan:
-			err := c.process(msg)
-			if err != nil {
-				c.Errors <- errors.Wrapf(err, "error calling ConsumerFunc for %q stream and %q message", msg.Stream, msg.ID)
-				continue
-			}
-			err = c.redis.XAck(msg.Stream, c.options.GroupName, msg.ID).Err()
-			if err != nil {
-				c.Errors <- errors.Wrapf(err, "error acknowledging after success for %q stream and %q message", msg.Stream, msg.ID)
-				continue
-			}
-		case <-c.stopPoll:
-			return
+	for msg := range stream.msgChan {
+		err := c.process(msg)
+		if err != nil {
+			c.Errors <- errors.Wrapf(err, "error calling ConsumerFunc for %q stream and %q message", msg.Stream, msg.ID)
+			continue
+		}
+		err = c.redis.XAck(msg.Stream, c.options.GroupName, msg.ID).Err()
+		if err != nil {
+			c.Errors <- errors.Wrapf(err, "error acknowledging after success for %q stream and %q message", msg.Stream, msg.ID)
+			continue
 		}
 	}
+
 }
 
 func (c *Consumer) process(msg *Message) (err error) {
