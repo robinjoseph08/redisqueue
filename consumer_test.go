@@ -1,6 +1,7 @@
 package redisqueue
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -508,4 +509,31 @@ func TestRun(t *testing.T) {
 		// run the consumer
 		c.Run()
 	})
+}
+
+func TestConsumer_MsgChan(t *testing.T) {
+	msgChan := make(chan string, 10)
+
+	go func() {
+		msgChan <- "hello"
+		msgChan <- "world"
+	}()
+
+	go func() {
+		msgChan <- "foo"
+		msgChan <- "bar"
+	}()
+
+	go func() {
+
+		time.Sleep(3 * time.Second)
+		msgChan <- "close"
+
+		close(msgChan)
+	}()
+
+	for m := range msgChan {
+		fmt.Println(m)
+	}
+
 }
